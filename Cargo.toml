@@ -1,0 +1,15 @@
+[package]
+name = "tellmewhy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "tellmewhy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tellmewhy-bin"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.70"
