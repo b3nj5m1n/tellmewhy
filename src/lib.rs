@@ -29,7 +29,8 @@ pub enum Status {
 pub struct Config {
     pub prompt_text: String,
     pub prompt_hint: String,
-    pub max_width: Option<usize>,
+    pub max_display_width: Option<usize>,
+    pub max_length: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -40,7 +41,7 @@ pub struct State<T> {
 
 fn get_width(config: &Config) -> Result<usize> {
     let terminal_width = usize::from(crossterm::terminal::size()?.0) - 1;
-    Ok(match config.max_width {
+    Ok(match config.max_display_width {
         Some(x) => std::cmp::min(x, terminal_width),
         None => terminal_width,
     })
@@ -88,7 +89,14 @@ fn get_input_suffix(s: &String, i: usize) -> String {
     return s.chars().skip(i.into()).collect();
 }
 
-fn insert_char_into_input(state: &mut State<String>, c: char) {
+fn insert_char_into_input(state: &mut State<String>, config: &Config, c: char) {
+    if let Some(x) = config.max_length {
+        if let Some(i) = state.input.clone() {
+            if i.chars().count() == x {
+                return;
+            }
+        }
+    }
     match state.input.clone() {
         Some(input) => {
             let mut result = String::from("");
@@ -107,7 +115,7 @@ fn insert_char_into_input(state: &mut State<String>, c: char) {
     }
 }
 
-fn remove_char_from_input(state: &mut State<String>) {
+fn remove_char_from_input(state: &mut State<String>, _config: &Config) {
     if let Some(input) = state.input.clone() {
         let mut result = String::from("");
         result.push_str(&get_input_prefix(
@@ -143,11 +151,11 @@ impl Promptable for String {
         match event {
             Some(event) => match event.code {
                 event::KeyCode::Char(c) => {
-                    insert_char_into_input(state, c);
+                    insert_char_into_input(state, config, c);
                     Self::move_cursor(state, 1);
                 }
                 event::KeyCode::Backspace => {
-                    remove_char_from_input(state);
+                    remove_char_from_input(state, config);
                     Self::move_cursor(state, -1);
                 }
                 event::KeyCode::Left => {
@@ -164,7 +172,7 @@ impl Promptable for String {
         // dbg!(&state);
         // let result_len = u16::try_from(UnicodeWidthStr::width(result.as_str()))?;
         let prompt_len = u16::try_from(UnicodeWidthStr::width(config.prompt_text.as_str()))?;
-        let hint_len = u16::try_from(UnicodeWidthStr::width(config.prompt_hint.as_str()))?;
+        // let hint_len = u16::try_from(UnicodeWidthStr::width(config.prompt_hint.as_str()))?;
         let width = get_width(config)? - usize::from(prompt_len);
         execute!(
             io::stdout(),
@@ -191,14 +199,11 @@ impl Promptable for String {
                 None => style::Print(truncate(config.prompt_hint.clone(), width)),
                 Some(s) => style::Print(truncate(s, width)),
             },
-            match state.input.clone() {
-                None => cursor::MoveToColumn(prompt_len),
-                Some(_) => cursor::MoveToColumn(
-                    prompt_len
-                        + u16::try_from(state.cursor_position)
-                            .expect("Cursor position exceeds maximum 16 bit unsigned int value")
-                ),
-            },
+            cursor::MoveToColumn(
+                prompt_len
+                    + u16::try_from(state.cursor_position)
+                        .expect("Cursor position exceeds maximum 16 bit unsigned int value")
+            ),
             style::ResetColor
         )?;
         Ok(false)
