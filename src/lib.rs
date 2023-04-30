@@ -263,3 +263,147 @@ impl Promptable for String {
 //     )?;
 //     Ok(buffer)
 // }
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+    use pretty_assertions::{assert_eq, assert_ne};
+
+    #[test]
+    fn t_get_input_prefix() {
+        assert_eq!(
+            get_input_prefix(&String::from("test"), 4),
+            String::from("test")
+        );
+        assert_eq!(
+            get_input_prefix(&String::from("test"), 2),
+            String::from("te")
+        );
+    }
+
+    #[test]
+    fn t_get_input_suffix() {
+        assert_eq!(
+            get_input_suffix(&String::from("test"), 2),
+            String::from("st")
+        );
+        assert_eq!(get_input_suffix(&String::from("test"), 4), String::from(""));
+    }
+
+    #[test]
+    fn t_insert_char_into_input_x_end() {
+        let mut state: State<String> = State {
+            input: Some("tes".into()),
+            cursor_position: 4,
+        };
+        let config = Config {
+            prompt_text: "".into(),
+            prompt_hint: "".into(),
+            max_display_width: None,
+            max_length: None,
+        };
+        insert_char_into_input(&mut state, &config, 't');
+        assert_eq!(state.input, Some("test".into()));
+    }
+
+    #[test]
+    fn t_insert_char_into_input_x_beginning() {
+        let mut state: State<String> = State {
+            input: Some("est".into()),
+            cursor_position: 0,
+        };
+        let config = Config {
+            prompt_text: "".into(),
+            prompt_hint: "".into(),
+            max_display_width: None,
+            max_length: None,
+        };
+        insert_char_into_input(&mut state, &config, 't');
+        assert_eq!(state.input, Some("test".into()));
+    }
+
+    #[test]
+    fn t_insert_char_into_input_x_middle() {
+        let mut state: State<String> = State {
+            input: Some("tst".into()),
+            cursor_position: 1,
+        };
+        let config = Config {
+            prompt_text: "".into(),
+            prompt_hint: "".into(),
+            max_display_width: None,
+            max_length: None,
+        };
+        insert_char_into_input(&mut state, &config, 'e');
+        assert_eq!(state.input, Some("test".into()));
+    }
+
+    #[test]
+    fn t_insert_char_into_input_x_reaching_limit() {
+        let mut state: State<String> = State {
+            input: Some("test".into()),
+            cursor_position: 0,
+        };
+        let config = Config {
+            prompt_text: "".into(),
+            prompt_hint: "".into(),
+            max_display_width: None,
+            max_length: Some(4),
+        };
+        insert_char_into_input(&mut state, &config, 't');
+        assert_eq!(state.input, Some("test".into()));
+    }
+
+    #[test]
+    fn t_remove_char_from_input_x_end() {
+        let mut state: State<String> = State {
+            input: Some("test".into()),
+            cursor_position: 4,
+        };
+        let config = Config {
+            prompt_text: "".into(),
+            prompt_hint: "".into(),
+            max_display_width: None,
+            max_length: None,
+        };
+        remove_char_from_input(&mut state, &config);
+        assert_eq!(state.input, Some("tes".into()));
+    }
+
+    #[test]
+    fn t_remove_char_from_input_x_beginning() {
+        let mut state: State<String> = State {
+            input: Some("test".into()),
+            cursor_position: 0,
+        };
+        let config = Config {
+            prompt_text: "".into(),
+            prompt_hint: "".into(),
+            max_display_width: None,
+            max_length: None,
+        };
+        remove_char_from_input(&mut state, &config);
+        assert_eq!(state.input, Some("test".into()));
+    }
+
+    #[test]
+    fn t_remove_char_from_input_x_middle() {
+        let mut state: State<String> = State {
+            input: Some("test".into()),
+            cursor_position: 2,
+        };
+        let config = Config {
+            prompt_text: "".into(),
+            prompt_hint: "".into(),
+            max_display_width: None,
+            max_length: None,
+        };
+        remove_char_from_input(&mut state, &config);
+        assert_eq!(state.input, Some("tst".into()));
+    }
+
+    #[test]
+    fn t_truncate() {
+        assert_eq!(truncate("test".into(), 2), "te".to_string());
+    }
+}
