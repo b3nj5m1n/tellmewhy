@@ -46,7 +46,7 @@
         };
 
         craneLibLLvmTools = craneLib.overrideToolchain
-          (fenix.packages.${system}.complete.withComponents [
+          (fenix.packages.${system}.stable.withComponents [
             "cargo"
             "llvm-tools"
             "rustc"

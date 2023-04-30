@@ -73,22 +73,18 @@ where
                 + usize::try_from(i).expect("Unreachable"))
             .clamp(0, Self::get_length(state));
         } else {
-            state.cursor_position = match state
+            state.cursor_position = state
                 .cursor_position
-                .checked_sub(usize::try_from(i.abs()).expect("Unreachable"))
-            {
-                Some(x) => x,
-                None => 0,
-            }
+                .saturating_sub(usize::try_from(i.abs()).expect("Unreachable"))
         }
     }
 }
 
-fn get_input_prefix(s: &String, i: usize) -> String {
-    return s.chars().take(i.into()).collect();
+fn get_input_prefix(s: &str, i: usize) -> String {
+    return s.chars().take(i).collect();
 }
-fn get_input_suffix(s: &String, i: usize) -> String {
-    return s.chars().skip(i.into()).collect();
+fn get_input_suffix(s: &str, i: usize) -> String {
+    return s.chars().skip(i).collect();
 }
 
 fn insert_char_into_input(state: &mut State<String>, config: &Config, c: char) {
@@ -122,10 +118,7 @@ fn remove_char_from_input(state: &mut State<String>, _config: &Config) {
         let mut result = String::from("");
         result.push_str(&get_input_prefix(
             &input,
-            match state.cursor_position.checked_sub(1) {
-                Some(x) => x,
-                None => 0,
-            },
+            state.cursor_position.saturating_sub(1),
         ));
         result.push_str(&get_input_suffix(&input, state.cursor_position));
         state.input = match result.is_empty() {
@@ -139,7 +132,7 @@ fn remove_char_from_input(state: &mut State<String>, _config: &Config) {
 
 fn truncate(s: String, width: usize) -> String {
     // println!("truncating {}", s);
-    s.chars().take(width.into()).collect()
+    s.chars().take(width).collect()
 }
 
 impl Promptable for String {
@@ -148,8 +141,8 @@ impl Promptable for String {
         event: Option<event::KeyEvent>,
         state: &mut State<Self>,
     ) -> Result<bool> {
-        match event {
-            Some(event) => match event.code {
+        if let Some(event) = event {
+            match event.code {
                 event::KeyCode::Char(c) => {
                     insert_char_into_input(state, config, c);
                     Self::move_cursor(state, 1);
@@ -170,8 +163,7 @@ impl Promptable for String {
                     }
                 }
                 _ => (),
-            },
-            None => (),
+            }
         };
         state.status = Self::validate(state);
         // dbg!(&state);
@@ -236,6 +228,11 @@ impl Promptable for String {
                         break;
                     }
                 }
+                event::Event::Resize(_, _) => {
+                    if Self::render_prompt(&config, None, &mut state)? {
+                        break;
+                    }
+                }
                 _ => (),
             }
         }
@@ -256,7 +253,7 @@ impl Promptable for String {
 
     fn validate(state: &State<Self>) -> Status {
         match state.input.clone() {
-            Some(i) => match i.chars().filter(|c| c.is_digit(10)).next().is_some() {
+            Some(i) => match i.chars().any(|c| c.is_ascii_digit()) {
                 true => Status::Invalid,
                 false => Status::Valid,
             },
@@ -282,7 +279,7 @@ impl Promptable for String {
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use pretty_assertions::{assert_eq, assert_ne};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn t_get_input_prefix() {
