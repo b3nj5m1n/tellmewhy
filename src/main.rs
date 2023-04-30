@@ -11,7 +11,7 @@ fn main() -> Result<()> {
             prompt_text: "Enter your name: ".into(),
             prompt_hint: "Firstname Lastname".into(),
             max_display_width: Some(50),
-            max_length: Some(5),
+            max_length: Some(15),
         },
     )?;
     println!("Hello, {name}");

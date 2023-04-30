@@ -9,6 +9,7 @@ use crossterm::execute;
 use crossterm::style;
 
 #[non_exhaustive]
+#[derive(Debug)]
 pub enum Role {
     Inactive,
     Active,
@@ -37,6 +38,8 @@ pub struct Config {
 pub struct State<T> {
     pub input: Option<T>,
     pub cursor_position: usize,
+    pub role: Role,
+    pub status: Status,
 }
 
 fn get_width(config: &Config) -> Result<usize> {
@@ -52,8 +55,6 @@ where
     Self: Sized,
 {
     fn render_prompt(
-        role: &Role,
-        status: &Status,
         config: &Config,
         event: Option<event::KeyEvent>,
         state: &mut State<Self>,
@@ -65,6 +66,7 @@ where
         init_config: Config,
     ) -> Result<Self>;
     fn get_length(state: &State<Self>) -> usize;
+    fn validate(state: &State<Self>) -> Status;
     fn move_cursor(state: &mut State<Self>, i: i8) {
         if i > 0 {
             state.cursor_position = (state.cursor_position
@@ -142,8 +144,6 @@ fn truncate(s: String, width: usize) -> String {
 
 impl Promptable for String {
     fn render_prompt(
-        role: &Role,
-        status: &Status,
         config: &Config,
         event: Option<event::KeyEvent>,
         state: &mut State<Self>,
@@ -164,11 +164,16 @@ impl Promptable for String {
                 event::KeyCode::Right => {
                     Self::move_cursor(state, 1);
                 }
-                event::KeyCode::Enter => return Ok(true),
+                event::KeyCode::Enter => {
+                    if matches!(state.status, Status::Valid | Status::Neutral) {
+                        return Ok(true);
+                    }
+                }
                 _ => (),
             },
             None => (),
         };
+        state.status = Self::validate(state);
         // dbg!(&state);
         // let result_len = u16::try_from(UnicodeWidthStr::width(result.as_str()))?;
         let prompt_len = u16::try_from(UnicodeWidthStr::width(config.prompt_text.as_str()))?;
@@ -182,14 +187,14 @@ impl Promptable for String {
         )?;
         execute!(
             io::stdout(),
-            match status {
+            match state.status {
                 Status::Neutral => style::SetForegroundColor(style::Color::Yellow),
                 Status::Uncertain => style::SetForegroundColor(style::Color::Grey),
                 Status::Valid => style::SetForegroundColor(style::Color::Green),
                 Status::Invalid => style::SetForegroundColor(style::Color::Red),
             },
             style::Print(config.prompt_text.clone()),
-            match role {
+            match state.role {
                 Role::Inactive => style::SetForegroundColor(style::Color::Grey),
                 Role::Active => style::SetForegroundColor(style::Color::White),
                 Role::Completed => style::SetForegroundColor(style::Color::Green),
@@ -216,18 +221,18 @@ impl Promptable for String {
         init_config: Config,
     ) -> Result<Self> {
         crossterm::terminal::enable_raw_mode()?;
-        let role = init_role;
-        let status = init_status;
         let config = init_config;
         let mut state = State {
             input: init_input,
             cursor_position: 0,
+            role: init_role,
+            status: init_status,
         };
-        Self::render_prompt(&role, &status, &config, None, &mut state)?;
+        Self::render_prompt(&config, None, &mut state)?;
         loop {
             match event::read()? {
                 event::Event::Key(key) => {
-                    if Self::render_prompt(&role, &status, &config, Some(key), &mut state)? {
+                    if Self::render_prompt(&config, Some(key), &mut state)? {
                         break;
                     }
                 }
@@ -246,6 +251,16 @@ impl Promptable for String {
         match &state.input {
             Some(s) => unicode_width::UnicodeWidthStr::width(s.as_str()),
             None => 0,
+        }
+    }
+
+    fn validate(state: &State<Self>) -> Status {
+        match state.input.clone() {
+            Some(i) => match i.chars().filter(|c| c.is_digit(10)).next().is_some() {
+                true => Status::Invalid,
+                false => Status::Valid,
+            },
+            None => Status::Uncertain,
         }
     }
 }
@@ -295,6 +310,8 @@ mod tests {
         let mut state: State<String> = State {
             input: Some("tes".into()),
             cursor_position: 4,
+            role: Role::Active,
+            status: Status::Neutral,
         };
         let config = Config {
             prompt_text: "".into(),
@@ -311,6 +328,8 @@ mod tests {
         let mut state: State<String> = State {
             input: Some("est".into()),
             cursor_position: 0,
+            role: Role::Active,
+            status: Status::Neutral,
         };
         let config = Config {
             prompt_text: "".into(),
@@ -327,6 +346,8 @@ mod tests {
         let mut state: State<String> = State {
             input: Some("tst".into()),
             cursor_position: 1,
+            role: Role::Active,
+            status: Status::Neutral,
         };
         let config = Config {
             prompt_text: "".into(),
@@ -343,6 +364,8 @@ mod tests {
         let mut state: State<String> = State {
             input: Some("test".into()),
             cursor_position: 0,
+            role: Role::Active,
+            status: Status::Neutral,
         };
         let config = Config {
             prompt_text: "".into(),
@@ -359,6 +382,8 @@ mod tests {
         let mut state: State<String> = State {
             input: Some("test".into()),
             cursor_position: 4,
+            role: Role::Active,
+            status: Status::Neutral,
         };
         let config = Config {
             prompt_text: "".into(),
@@ -375,6 +400,8 @@ mod tests {
         let mut state: State<String> = State {
             input: Some("test".into()),
             cursor_position: 0,
+            role: Role::Active,
+            status: Status::Neutral,
         };
         let config = Config {
             prompt_text: "".into(),
@@ -391,6 +418,8 @@ mod tests {
         let mut state: State<String> = State {
             input: Some("test".into()),
             cursor_position: 2,
+            role: Role::Active,
+            status: Status::Neutral,
         };
         let config = Config {
             prompt_text: "".into(),
