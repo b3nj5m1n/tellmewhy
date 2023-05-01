@@ -57,12 +57,37 @@ fn remove_char_from_input(state: &mut State<String>, _config: &Config) {
 }
 
 fn truncate(s: String, width: usize, cursor_position: usize) -> String {
+    // TODO this is scuffed
     let len = s.chars().count();
+    let ellipsis = "…";
+    let ellipsis_len = ellipsis.chars().count();
+    let min_width = 2 * ellipsis_len + 1;
+
     if len > width {
-        s.chars()
-            .skip(cursor_position.saturating_sub(width))
-            .take(width)
-            .collect()
+        let use_ellipsis = width >= min_width;
+        let mut start;
+        let mut end;
+        let mut result = String::new();
+
+        if use_ellipsis {
+            start = cursor_position.saturating_sub(width - ellipsis_len - 1);
+            end = start + width - 1 * ellipsis_len;
+        } else {
+            start = cursor_position.saturating_sub(width);
+            end = start + width;
+        }
+
+        if use_ellipsis && start > 0 {
+            result.push_str(ellipsis);
+        }
+
+        result.push_str(&s.chars().skip(start).take(end - start).collect::<String>());
+
+        if use_ellipsis && end < len {
+            result.push_str(ellipsis);
+        }
+
+        result
     } else {
         s.chars().take(width).collect()
     }
@@ -370,4 +395,19 @@ mod tests {
     fn t_truncate_x_scroll_end() {
         assert_eq!(truncate("test123".into(), 2, 7), "23".to_string());
     }
+
+    // #[test]
+    // fn t_truncate_x_normal_ellipsis() {
+    //     assert_eq!(truncate("test".into(), 4, 0), "te".to_string());
+    // }
+
+    // #[test]
+    // fn t_truncate_x_scroll_middle_ellipsis() {
+    //     assert_eq!(truncate("test123".into(), 4, 5), "t1".to_string());
+    // }
+
+    // #[test]
+    // fn t_truncate_x_scroll_end_ellipsis() {
+    //     assert_eq!(truncate("test123".into(), 4, 7), "23".to_string());
+    // }
 }
