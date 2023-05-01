@@ -38,9 +38,9 @@ pub struct State<T> {
 }
 
 fn get_width(config: &Config) -> Result<usize> {
-    let terminal_width = usize::from(crossterm::terminal::size()?.0) - 1;
+    let terminal_width = usize::from(crossterm::terminal::size()?.0);
     Ok(match config.max_display_width {
-        Some(x) => std::cmp::min(x, terminal_width),
+        Some(x) => x.min(terminal_width),
         None => terminal_width,
     })
 }

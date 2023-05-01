@@ -56,9 +56,16 @@ fn remove_char_from_input(state: &mut State<String>, _config: &Config) {
     }
 }
 
-fn truncate(s: String, width: usize) -> String {
-    // println!("truncating {}", s);
-    s.chars().take(width).collect()
+fn truncate(s: String, width: usize, cursor_position: usize) -> String {
+    let len = s.chars().count();
+    if len > width {
+        s.chars()
+            .skip(cursor_position.saturating_sub(width))
+            .take(width)
+            .collect()
+    } else {
+        s.chars().take(width).collect()
+    }
 }
 
 impl Promptable for String {
@@ -96,7 +103,8 @@ impl Promptable for String {
         // let result_len = u16::try_from(UnicodeWidthStr::width(result.as_str()))?;
         let prompt_len = u16::try_from(UnicodeWidthStr::width(config.prompt_text.as_str()))?;
         // let hint_len = u16::try_from(UnicodeWidthStr::width(config.prompt_hint.as_str()))?;
-        let width = get_width(config)? - usize::from(prompt_len);
+        let full_width = get_width(config)?;
+        let width = full_width.saturating_sub(usize::from(prompt_len));
         execute!(
             io::stdout(),
             // cursor::RestorePosition,
@@ -119,13 +127,21 @@ impl Promptable for String {
                 Role::Aborted => style::SetForegroundColor(style::Color::Red),
             },
             match state.input.clone() {
-                None => style::Print(truncate(config.prompt_hint.clone(), width)),
-                Some(s) => style::Print(truncate(s, width)),
+                None => style::Print(truncate(
+                    config.prompt_hint.clone(),
+                    width,
+                    state.cursor_position
+                )),
+                Some(s) => style::Print(truncate(s, width, state.cursor_position)),
             },
             cursor::MoveToColumn(
-                prompt_len
+                (prompt_len
                     + u16::try_from(state.cursor_position)
+                        .expect("Cursor position exceeds maximum 16 bit unsigned int value"))
+                .min(
+                    u16::try_from(full_width)
                         .expect("Cursor position exceeds maximum 16 bit unsigned int value")
+                )
             ),
             style::ResetColor
         )?;
@@ -341,7 +357,17 @@ mod tests {
     }
 
     #[test]
-    fn t_truncate() {
-        assert_eq!(truncate("test".into(), 2), "te".to_string());
+    fn t_truncate_x_normal() {
+        assert_eq!(truncate("test".into(), 2, 0), "te".to_string());
+    }
+
+    #[test]
+    fn t_truncate_x_scroll_middle() {
+        assert_eq!(truncate("test123".into(), 2, 5), "t1".to_string());
+    }
+
+    #[test]
+    fn t_truncate_x_scroll_end() {
+        assert_eq!(truncate("test123".into(), 2, 7), "23".to_string());
     }
 }

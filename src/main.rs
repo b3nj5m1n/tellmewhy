@@ -10,8 +10,8 @@ fn main() -> Result<()> {
         tellmewhy::Config {
             prompt_text: "Enter your name: ".into(),
             prompt_hint: "Firstname Lastname".into(),
-            max_display_width: Some(50),
-            max_length: Some(15),
+            max_display_width: Some(25),
+            max_length: None,
         },
     )?;
     println!("Hello, {name}");
