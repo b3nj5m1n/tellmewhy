@@ -56,40 +56,34 @@ fn remove_char_from_input(state: &mut State<String>, _config: &Config) {
     }
 }
 
-fn truncate(s: String, width: usize, cursor_position: usize) -> String {
+fn truncate(s: String, width: usize, cursor_position: usize) -> (String, usize) {
     // TODO this is scuffed
+    // FIXME doesn't respect width (will be 1 more than width when cutoff during scroll to the right)
     let len = s.chars().count();
     let ellipsis = "…";
     let ellipsis_len = ellipsis.chars().count();
     let min_width = 2 * ellipsis_len + 1;
 
-    if len > width {
-        let use_ellipsis = width >= min_width;
-        let mut start;
-        let mut end;
-        let mut result = String::new();
+    if len >= width {
+        let start = cursor_position.saturating_sub(width);
+        let end = start + width;
+        let display_ellipsis = width > min_width;
 
-        if use_ellipsis {
-            start = cursor_position.saturating_sub(width - ellipsis_len - 1);
-            end = start + width - 1 * ellipsis_len;
-        } else {
-            start = cursor_position.saturating_sub(width);
-            end = start + width;
+        let mut result = s.chars().skip(start).take(end - start).collect::<String>();
+
+        if start > 0 && display_ellipsis {
+            result.remove(0);
+            result.insert_str(0, ellipsis);
         }
 
-        if use_ellipsis && start > 0 {
+        if end < len && display_ellipsis {
+            // result.pop();
             result.push_str(ellipsis);
         }
 
-        result.push_str(&s.chars().skip(start).take(end - start).collect::<String>());
-
-        if use_ellipsis && end < len {
-            result.push_str(ellipsis);
-        }
-
-        result
+        (result, width)
     } else {
-        s.chars().take(width).collect()
+        (s.chars().take(width).collect(), width)
     }
 }
 
@@ -130,6 +124,8 @@ impl Promptable for String {
         // let hint_len = u16::try_from(UnicodeWidthStr::width(config.prompt_hint.as_str()))?;
         let full_width = get_width(config)?;
         let width = full_width.saturating_sub(usize::from(prompt_len));
+        let (input, cursor_move) =
+            truncate(config.prompt_hint.clone(), width, state.cursor_position);
         execute!(
             io::stdout(),
             // cursor::RestorePosition,
@@ -152,16 +148,12 @@ impl Promptable for String {
                 Role::Aborted => style::SetForegroundColor(style::Color::Red),
             },
             match state.input.clone() {
-                None => style::Print(truncate(
-                    config.prompt_hint.clone(),
-                    width,
-                    state.cursor_position
-                )),
-                Some(s) => style::Print(truncate(s, width, state.cursor_position)),
+                None => style::Print(input),
+                Some(s) => style::Print(truncate(s, width, state.cursor_position).0),
             },
             cursor::MoveToColumn(
                 (prompt_len
-                    + u16::try_from(state.cursor_position)
+                    + u16::try_from(state.cursor_position.min(cursor_move))
                         .expect("Cursor position exceeds maximum 16 bit unsigned int value"))
                 .min(
                     u16::try_from(full_width)
@@ -383,31 +375,32 @@ mod tests {
 
     #[test]
     fn t_truncate_x_normal() {
-        assert_eq!(truncate("test".into(), 2, 0), "te".to_string());
+        assert_eq!(truncate("test".into(), 2, 0), ("te".to_string(), 2));
     }
 
     #[test]
     fn t_truncate_x_scroll_middle() {
-        assert_eq!(truncate("test123".into(), 2, 5), "t1".to_string());
+        assert_eq!(truncate("test123".into(), 2, 5), ("t1".to_string(), 2));
     }
 
     #[test]
     fn t_truncate_x_scroll_end() {
-        assert_eq!(truncate("test123".into(), 2, 7), "23".to_string());
+        assert_eq!(truncate("test123".into(), 2, 7), ("23".to_string(), 2));
     }
 
-    // #[test]
-    // fn t_truncate_x_normal_ellipsis() {
-    //     assert_eq!(truncate("test".into(), 4, 0), "te".to_string());
-    // }
+    #[test]
+    fn t_truncate_x_normal_ellipsis() {
+        // Doesn't properly respect width but best I can do right now
+        assert_eq!(truncate("test123".into(), 4, 0), ("test…".to_string(), 4));
+    }
 
-    // #[test]
-    // fn t_truncate_x_scroll_middle_ellipsis() {
-    //     assert_eq!(truncate("test123".into(), 4, 5), "t1".to_string());
-    // }
+    #[test]
+    fn t_truncate_x_scroll_middle_ellipsis() {
+        assert_eq!(truncate("test123".into(), 4, 5), ("…st1…".to_string(), 4));
+    }
 
-    // #[test]
-    // fn t_truncate_x_scroll_end_ellipsis() {
-    //     assert_eq!(truncate("test123".into(), 4, 7), "23".to_string());
-    // }
+    #[test]
+    fn t_truncate_x_scroll_end_ellipsis() {
+        assert_eq!(truncate("test123".into(), 4, 7), ("…123".to_string(), 4));
+    }
 }
