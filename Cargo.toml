@@ -2,6 +2,12 @@
 name = "tellmewhy"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "Command line prompting"
+homepage = "https://github.com/b3nj5m1n/tellmewhy"
+repository = "https://github.com/b3nj5m1n/tellmewhy"
+keywords = ["cli", "terminal", "prompt", "input"]
+categories = ["command-line-interface"]
 
 [lib]
 name = "tellmewhy"
