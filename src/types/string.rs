@@ -88,7 +88,7 @@ impl Promptable for String {
         init_role: Role,
         init_status: Status,
         init_config: Config,
-    ) -> Result<Self> {
+    ) -> Result<Message<Self>> {
         crossterm::terminal::enable_raw_mode()?;
         let config = init_config;
         let mut state = State {
@@ -116,7 +116,7 @@ impl Promptable for String {
         crossterm::terminal::disable_raw_mode()?;
         execute!(io::stdout(), style::Print("\n"))?;
         match state.input {
-            Some(i) => Ok(i),
+            Some(i) => Ok(Message::Result((i))),
             None => Err(anyhow::anyhow!("Prompt exited without input")),
         }
     }

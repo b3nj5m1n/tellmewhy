@@ -38,6 +38,13 @@ pub struct State<T> {
     pub status: Status,
 }
 
+#[derive(Debug)]
+pub enum Message<T> {
+    Result(T),
+    PreviousPrompt,
+    NextPrompt,
+}
+
 fn get_width(config: &Config) -> Result<usize> {
     let terminal_width = usize::from(crossterm::terminal::size()?.0);
     Ok(match config.max_display_width {
@@ -60,7 +67,7 @@ where
         init_role: Role,
         init_status: Status,
         init_config: Config,
-    ) -> Result<Self>;
+    ) -> Result<Message<Self>>;
     fn get_length(state: &State<Self>) -> usize;
     fn validate(state: &State<Self>) -> Status {
         state.status

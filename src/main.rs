@@ -14,6 +14,6 @@ fn main() -> Result<()> {
             max_length: None,
         },
     )?;
-    println!("Hello, {name}");
+    println!("Hello, {name:?}");
     Ok(())
 }
