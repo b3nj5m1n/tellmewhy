@@ -2,6 +2,7 @@ use anyhow::Result;
 use crossterm::event;
 
 mod types;
+mod util;
 
 #[non_exhaustive]
 #[derive(Debug)]
